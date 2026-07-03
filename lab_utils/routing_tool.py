@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from lab_utils.semantic_router import AgentCapability, SemanticRouter
 
 _DEFAULT_AGENTS = [
@@ -25,6 +27,21 @@ _DEFAULT_AGENTS = [
 _router = SemanticRouter(agents=_DEFAULT_AGENTS)
 
 
+def _is_database_request(user_request: str) -> bool:
+    text = user_request.lower()
+    sql_patterns = [
+        r"\bselect\b",
+        r"\bfrom\b",
+        r"\bwhere\b",
+        r"\bsql\b",
+        r"\bagent_metrics\b",
+    ]
+    metric_terms = ("latency", "metrics", "database", "truy vấn", "độ trễ")
+    return any(re.search(pattern, text) for pattern in sql_patterns) or any(
+        term in text for term in metric_terms
+    )
+
+
 def suggest_routing(user_request: str) -> dict:
     """Gợi ý specialist phù hợp cho yêu cầu người dùng (chỉ mang tính tư vấn).
 
@@ -39,6 +56,8 @@ def suggest_routing(user_request: str) -> dict:
     """
     candidates = _router.route(user_request, top_k=3)
     recommended = _router.route_with_fallback(user_request, fallback="orchestrator")
+    if _is_database_request(user_request):
+        recommended = "database_agent"
     return {
         "recommended_agent": recommended,
         "top_candidates": [
